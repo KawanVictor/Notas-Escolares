@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lançamento de Notas Escolares</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <main id="tela-carregando" class="centro">
+    <p id="mensagem-carregando" class="suave">Carregando…</p>
+  </main>
+
+  <main id="tela-entrar" class="centro" hidden>
+    <section class="cartao">
+      <p class="sobretitulo">Sistema de lançamento de notas</p>
+      <h1>Lançamento de Notas Escolares</h1>
+
+      <form id="form-entrar" class="formulario">
+        <h2>Entrar</h2>
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="username" spellcheck="false" enterkeyhint="next" required>
+        <label for="current-password">Senha</label>
+        <input id="current-password" name="password" type="password" autocomplete="current-password" enterkeyhint="done" required>
+        <label class="opcao"><input type="checkbox" data-mostrar-senha="current-password"> Mostrar senha</label>
+        <button type="submit" class="primario">Entrar</button>
+        <p class="links">
+          <button type="button" class="link" data-formulario="cadastro">Criar conta</button>
+          <button type="button" class="link" data-formulario="recuperar">Esqueci minha senha</button>
+        </p>
+      </form>
+
+      <form id="form-cadastro" class="formulario" hidden>
+        <h2>Criar conta</h2>
+        <label for="cadastro-email">E-mail</label>
+        <input id="cadastro-email" name="email" type="email" autocomplete="username" spellcheck="false" enterkeyhint="next" required>
+        <label for="new-password">Senha (mínimo de 8 caracteres)</label>
+        <input id="new-password" name="new-password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="done" required>
+        <label class="opcao"><input type="checkbox" data-mostrar-senha="new-password"> Mostrar senha</label>
+        <button type="submit" class="primario">Criar conta</button>
+        <p class="links">
+          <button type="button" class="link" data-formulario="entrar">Já tenho conta</button>
+        </p>
+      </form>
+
+      <form id="form-recuperar" class="formulario" hidden>
+        <h2>Recuperar senha</h2>
+        <p class="suave">Enviaremos um link para você criar uma senha nova.</p>
+        <label for="recuperar-email">E-mail</label>
+        <input id="recuperar-email" name="email" type="email" autocomplete="username" spellcheck="false" enterkeyhint="done" required>
+        <button type="submit" class="primario">Enviar link</button>
+        <p class="links">
+          <button type="button" class="link" data-formulario="entrar">Voltar para entrar</button>
+        </p>
+      </form>
+
+      <form id="form-nova-senha" class="formulario" hidden>
+        <h2>Criar senha nova</h2>
+        <label for="senha-nova">Senha nova (mínimo de 8 caracteres)</label>
+        <input id="senha-nova" name="new-password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="done" required>
+        <label class="opcao"><input type="checkbox" data-mostrar-senha="senha-nova"> Mostrar senha</label>
+        <button type="submit" class="primario">Salvar senha nova</button>
+      </form>
+
+      <p id="aviso-entrar" class="aviso" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <div id="area-logada" hidden>
+    <header class="barra-usuario no-print">
+      <strong>Lançamento de Notas Escolares</strong>
+      <span class="barra-direita">
+        <span id="usuario-email" class="suave"></span>
+        <button id="btn-sair" type="button" class="secundario pequeno">Sair</button>
+      </span>
+    </header>
+
+    <main id="tela-lista" class="pagina" hidden>
+      <section class="folha">
+        <header class="cabecalho-folha">
+          <div>
+            <p class="sobretitulo">Seus lançamentos</p>
+            <h1>Turmas e disciplinas</h1>
+          </div>
+          <button id="btn-novo" type="button" class="primario">Novo lançamento</button>
+        </header>
+        <p id="aviso-lista" class="aviso com-margem" role="status" aria-live="polite"></p>
+        <ul id="lista-lancamentos" class="lista"></ul>
+      </section>
+    </main>
+
+    <main id="tela-planilha" class="pagina" hidden>
+      <section class="folha">
+        <header class="cabecalho-folha">
+          <div>
+            <p class="sobretitulo">Lançamento de notas</p>
+            <h1 id="titulo-planilha">Novo lançamento</h1>
+          </div>
+          <div class="acoes no-print">
+            <button id="btn-voltar" type="button" class="secundario">Voltar</button>
+            <button id="btn-adicionar" type="button" class="primario">Adicionar aluno</button>
+            <button id="btn-salvar" type="button" class="primario">Salvar</button>
+            <button id="btn-csv" type="button" class="secundario">Exportar CSV</button>
+            <button id="btn-imprimir" type="button" class="secundario">Imprimir / PDF</button>
+          </div>
+        </header>
+
+        <section id="dados-turma" class="dados-turma" aria-label="Dados da turma"></section>
+
+        <div class="barra-status no-print">
+          <span id="status" role="status" aria-live="polite"></span>
+          <span class="legenda">
+            <strong class="boa">Boa</strong>
+            <strong class="intermediaria">Intermediária</strong>
+            <strong class="baixa">Baixa</strong>
+          </span>
+        </div>
+
+        <section class="area-tabela" aria-label="Tabela de alunos e notas">
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2" class="col-numero">Nº</th>
+                <th rowspan="2" class="col-nome">Nome do aluno</th>
+                <th colspan="8">Atividades principais</th>
+                <th rowspan="2" class="calculada">Média total</th>
+                <th colspan="2" class="integradas">Avaliações integradas</th>
+                <th rowspan="2" class="calculada">Média avaliação integrada</th>
+                <th rowspan="2" class="calculada">Média final integrada</th>
+                <th rowspan="2" class="calculada">Média trimestral</th>
+                <th rowspan="2" class="col-acoes no-print">Ações</th>
+              </tr>
+              <tr id="titulos-atividades"></tr>
+            </thead>
+            <tbody id="corpo-tabela"></tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="dialogo">
+    <form method="dialog">
+      <p id="dialogo-mensagem"></p>
+      <div id="dialogo-botoes" class="dialogo-botoes"></div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -1,5 +1,7 @@
+node_modules/
+.vercel/
 __pycache__/
 *.pyc
 
-# Lançamentos salvos: contêm nomes e notas de alunos.
-dados/
+# Lançamentos salvos pela versão desktop: contêm nomes e notas de alunos.
+desktop/dados/
