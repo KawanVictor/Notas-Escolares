@@ -1,8 +1,14 @@
 # Lançamento de Notas Escolares
 
+[![Testes](https://github.com/KawanVictor/Notas-Escolares/actions/workflows/ci.yml/badge.svg)](https://github.com/KawanVictor/Notas-Escolares/actions/workflows/ci.yml)
+
 Site para lançar as notas de uma turma, calcular as médias do trimestre e gerar a planilha em CSV ou PDF. Cada professor entra com a própria conta e acessa os seus lançamentos de qualquer computador ou celular.
 
 **Endereço do site:** https://notas-escolares-iota.vercel.app
+
+![Planilha de lançamento de notas, com as médias coloridas por faixa](docs/planilha.png)
+
+Os nomes e as notas da imagem são fictícios.
 
 ## Como usar
 
@@ -55,18 +61,21 @@ O site é estático (HTML, CSS e JavaScript, sem etapa de build) e fica hospedad
 | Caminho | Conteúdo |
 |---|---|
 | `public/` | O site publicado: `index.html`, `style.css` e a pasta `js/` |
-| `public/js/app.js` | Telas, login e gravação no Supabase |
+| `public/js/app.js` | Telas: liga os botões e campos da página aos módulos abaixo |
+| `public/js/conta.js` | Entrar, criar conta, recuperar senha e acompanhar a sessão |
+| `public/js/dados.js` | Leitura, gravação e exclusão dos lançamentos no Supabase |
 | `public/js/notas.js` | Regras: cálculo das médias e geração do CSV |
 | `public/js/config.js` | Endereço e chave pública do projeto no Supabase |
 | `supabase/migrations/` | Tabelas, regras de acesso e gatilho do banco |
-| `tests/` | Testes das regras |
+| `tests/` | Testes automáticos |
+| `scripts/servidor.js` | Servidor local usado pelo `npm run dev` |
+| `.github/workflows/ci.yml` | Roda os testes no GitHub a cada envio |
 | `vercel.json` | Cabeçalhos de segurança do site |
-| `desktop/` | Versão antiga para computador, que funciona sem internet |
-| `teste.py` | Exercício avulso de Python, sem relação com o sistema |
+| `docs/` | Imagem usada neste README |
 
 ### Rodar no seu computador
 
-É preciso ter o Node.js 20 ou mais novo e o Python 3.
+É preciso ter o Node.js 20 ou mais novo. O projeto não tem dependências, então não há nada para instalar.
 
 ```
 npm run dev
@@ -74,11 +83,23 @@ npm run dev
 
 O site abre em `http://localhost:8123` e usa o mesmo banco do site publicado. Os links enviados por e-mail (confirmação de conta e senha nova) sempre levam ao site publicado, a menos que você inclua `http://localhost:8123` em **Authentication > URL Configuration > Redirect URLs** no Supabase.
 
-Para rodar os testes das regras:
+### Testes
 
 ```
 npm test
 ```
+
+Os testes rodam só com o Node, sem instalar nada, e o GitHub os executa a cada envio para a `main` e a cada pull request.
+
+| Arquivo | O que cobre |
+|---|---|
+| `tests/notas.test.js` | Cálculo das médias, faixas, datas e CSV, incluindo a proteção contra fórmulas |
+| `tests/conta.test.js` | Entrar, criar conta, recuperar senha, mensagens de erro e as trocas de tela conforme a sessão |
+| `tests/dados.test.js` | Gravação em três passos, falha em cada passo e nova tentativa, remoção de alunos e exclusão de lançamentos |
+
+Os testes de conta e de dados usam um Supabase simulado (`tests/ajuda/supabase-falso.js`), então não tocam no banco real. O que eles não cobrem: a página em si (botões, tabela, diálogos) e as regras de acesso do banco, que precisam ser conferidas no navegador e no Supabase.
+
+No CSV exportado, um nome ou campo que comece com `=`, `+`, `-` ou `@` recebe um apóstrofo na frente, para o Excel não executá-lo como fórmula.
 
 ### Publicação (Vercel)
 
@@ -110,10 +131,6 @@ Pontos de atenção:
 
 As atividades, a nota máxima e os limites das faixas estão no início de `public/js/notas.js`. Uma atividade nova também precisa de uma coluna na tabela `alunos`.
 
-### Versão desktop
+## Licença
 
-A pasta `desktop/` guarda a versão para computador (Python com Tkinter), que salva arquivos `.json` locais e não conversa com o site.
-
-```
-python desktop/app.py
-```
+[MIT](LICENSE).

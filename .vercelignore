@@ -1,4 +1,5 @@
-desktop/
-tests/
+.github/
+docs/
+scripts/
 supabase/
-*.py
+tests/

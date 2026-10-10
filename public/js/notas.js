@@ -178,7 +178,13 @@ export function titulosDasColunas() {
 }
 
 function escaparCsv(valor) {
-  const texto = String(valor ?? "");
+  let texto = String(valor ?? "");
+
+  // Um texto que começa com =, +, - ou @ seria executado como fórmula ao abrir no Excel;
+  // o apóstrofo na frente faz a planilha tratá-lo como texto.
+  if (/^[=+\-@\t\r]/.test(texto)) {
+    texto = `'${texto}`;
+  }
 
   return /[;"\r\n]/.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
 }

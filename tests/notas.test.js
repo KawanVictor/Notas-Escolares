@@ -122,3 +122,23 @@ test("CSV escapa aspas", () => {
 
   assert.ok(csv.includes('"Ana ""Nina"""'));
 });
+
+test("CSV neutraliza textos que o Excel executaria como fórmula", () => {
+  const perigosos = ['=HYPERLINK("http://exemplo.test";"clique")', "+55 11 9999", "-Ana", "@SUM(A1)", "\t=1+1"];
+  const linhas = notas.gerarCsv({ escola: "=1+1" }, perigosos.map((nome) => alunoCom(nome))).split("\r\n");
+  const primeira = Object.keys(notas.CAMPOS_CABECALHO).length + 2;
+
+  assert.equal(linhas[0], "Nome da escola;'=1+1");
+  assert.ok(linhas[primeira].startsWith(`1;"'=HYPERLINK(""http://exemplo.test"";""clique"")";`), linhas[primeira]);
+  assert.ok(linhas[primeira + 1].startsWith("2;'+55 11 9999;"));
+  assert.ok(linhas[primeira + 2].startsWith("3;'-Ana;"));
+  assert.ok(linhas[primeira + 3].startsWith("4;'@SUM(A1);"));
+  assert.ok(linhas[primeira + 4].startsWith("5;'\t=1+1;"));
+});
+
+test("CSV não mexe em nomes comuns nem nas notas", () => {
+  const csv = notas.gerarCsv({}, [alunoCom("Ana-Maria d'Ávila", { oralidade: "0", leitura: "4,5" })]);
+  const linha = csv.split("\r\n").at(-1);
+
+  assert.ok(linha.startsWith("1;Ana-Maria d'Ávila;0;4,5;"), linha);
+});

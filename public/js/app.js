@@ -1,21 +1,20 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 import { SUPABASE_CHAVE_PUBLICA, SUPABASE_URL } from "./config.js";
+import * as conta from "./conta.js";
+import * as dados from "./dados.js";
 import * as notas from "./notas.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TELAS = ["carregando", "entrar", "lista", "planilha"];
 const FORMULARIOS = ["entrar", "cadastro", "recuperar", "nova-senha"];
 const CHAVES_ATIVIDADES = Object.keys(notas.TODAS_ATIVIDADES);
-const MAXIMO_DE_ALUNOS = 200;
 
 const $ = (id) => document.getElementById(id);
 
 // O link de "esqueci minha senha" volta para esta página com type=recovery no endereço.
 // Precisa ser lido antes de criar o cliente, que consome e limpa esse trecho.
-let recuperandoSenha = location.hash.includes("type=recovery");
-let sessaoIniciada = false;
-let usuario = null;
+let sessao = conta.estadoInicialDaSessao(location.hash.includes("type=recovery"));
 let planilha = null;
 let alterado = false;
 let supabase = null;
@@ -24,7 +23,7 @@ if (SUPABASE_URL && SUPABASE_CHAVE_PUBLICA) {
   supabase = createClient(SUPABASE_URL, SUPABASE_CHAVE_PUBLICA);
   montarPagina();
   // O retorno roda fora do evento porque chamar o Supabase de dentro dele pode travar a sessão.
-  supabase.auth.onAuthStateChange((evento, sessao) => setTimeout(() => aoMudarSessao(evento, sessao), 0));
+  supabase.auth.onAuthStateChange((evento, nova) => setTimeout(() => aoMudarSessao(evento, nova), 0));
 } else {
   $("mensagem-carregando").textContent =
     "O sistema ainda não foi configurado: preencha o endereço e a chave do Supabase em js/config.js.";
@@ -63,24 +62,6 @@ function marcarAlterado() {
   definirStatus("Há alterações ainda não salvas.", "alerta");
 }
 
-/** Mensagens do Supabase chegam em inglês; estas são as que o usuário costuma encontrar. */
-function traduzirErro(erro) {
-  const mensagem = erro?.message ?? "";
-  const conhecidas = [
-    ["Invalid login credentials", "E-mail ou senha incorretos."],
-    ["Email not confirmed", "Confirme o seu e-mail pelo link que enviamos antes de entrar."],
-    ["User already registered", "Já existe uma conta com este e-mail."],
-    ["Password should be", "A senha é fraca demais. Use pelo menos 8 caracteres."],
-    ["New password should be different", "A senha nova precisa ser diferente da anterior."],
-    ["rate limit", "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo."],
-    ["Failed to fetch", "Sem conexão com o servidor. Verifique a internet e tente de novo."],
-    ["NetworkError", "Sem conexão com o servidor. Verifique a internet e tente de novo."]
-  ];
-  const conhecida = conhecidas.find(([trecho]) => mensagem.toLowerCase().includes(trecho.toLowerCase()));
-
-  return conhecida ? conhecida[1] : (mensagem || "Não foi possível concluir a operação.");
-}
-
 /** Desabilita o botão enquanto a operação roda, para evitar cliques repetidos. */
 async function comBotaoOcupado(botao, operacao) {
   botao.disabled = true;
@@ -97,6 +78,16 @@ function perguntar(mensagem, botoes) {
   const dialogo = $("dialogo");
 
   return new Promise((resolver) => {
+    const escuta = new AbortController();
+    const concluir = (valor) => {
+      escuta.abort();
+      resolver(valor);
+
+      if (dialogo.open) {
+        dialogo.close();
+      }
+    };
+
     $("dialogo-mensagem").textContent = mensagem;
     $("dialogo-botoes").replaceChildren(
       ...botoes.map(({ valor, texto, estilo = "secundario" }) => {
@@ -105,16 +96,14 @@ function perguntar(mensagem, botoes) {
         botao.type = "button";
         botao.textContent = texto;
         botao.className = estilo;
-        botao.addEventListener("click", () => {
-          resolver(valor);
-          dialogo.close();
-        });
+        botao.addEventListener("click", () => concluir(valor));
 
         return botao;
       })
     );
-    // Fechar com Esc cai aqui; depois de um clique a promessa já está resolvida e isto não muda nada.
-    dialogo.addEventListener("close", () => resolver("cancelar"), { once: true });
+    // "cancel" só acontece ao fechar com Esc. O evento "close" não serve aqui: ele chega atrasado
+    // e poderia cancelar a pergunta seguinte, se ela fosse aberta logo depois desta.
+    dialogo.addEventListener("cancel", () => concluir("cancelar"), { signal: escuta.signal });
     dialogo.showModal();
   });
 }
@@ -179,7 +168,7 @@ function montarPagina() {
   $("form-recuperar").addEventListener("submit", pedirRecuperacao);
   $("form-nova-senha").addEventListener("submit", salvarSenhaNova);
   $("btn-sair").addEventListener("click", sair);
-  $("btn-novo").addEventListener("click", () => abrirPlanilha(null, { data: notas.dataDeHoje() }, []));
+  $("btn-novo").addEventListener("click", () => abrirPlanilha(dados.novaPlanilha(), { data: notas.dataDeHoje() }));
   $("btn-voltar").addEventListener("click", async () => {
     if (await podeSairDaPlanilha()) {
       mostrarLista();
@@ -206,32 +195,22 @@ function montarPagina() {
 
 // ----- Conta -----
 
-async function aoMudarSessao(evento, sessao) {
-  if (evento === "PASSWORD_RECOVERY") {
-    recuperandoSenha = true;
+async function aoMudarSessao(evento, nova) {
+  const decisao = conta.decidirSessao(sessao, evento, nova);
+
+  sessao = decisao.estado;
+
+  if (decisao.acao === "manter") {
+    return;
   }
 
-  if (recuperandoSenha && sessao) {
+  if (decisao.acao === "nova-senha") {
     mostrarTela("entrar");
     mostrarFormulario("nova-senha");
     return;
   }
 
-  // Link de recuperação vencido ou inválido: volta ao fluxo normal de entrada.
-  recuperandoSenha = false;
-
-  const novoUsuario = sessao?.user ?? null;
-
-  // O Supabase repete o aviso de sessão ao renovar o acesso ou ao voltar para a aba;
-  // nesses casos a tela não pode ser redesenhada, senão a edição em andamento se perde.
-  if (sessaoIniciada && novoUsuario?.id === usuario?.id) {
-    return;
-  }
-
-  sessaoIniciada = true;
-  usuario = novoUsuario;
-
-  if (!usuario) {
+  if (decisao.acao === "entrar") {
     planilha = null;
     alterado = false;
     mostrarTela("entrar");
@@ -239,7 +218,7 @@ async function aoMudarSessao(evento, sessao) {
     return;
   }
 
-  $("usuario-email").textContent = usuario.email ?? "";
+  $("usuario-email").textContent = nova.user.email ?? "";
 
   const idNoEndereco = location.hash.slice(1);
 
@@ -250,17 +229,16 @@ async function aoMudarSessao(evento, sessao) {
   }
 }
 
+const enderecoDoSite = () => location.origin + location.pathname;
+
 async function entrar(evento) {
   evento.preventDefault();
 
   await comBotaoOcupado(evento.submitter, async () => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: $("email").value.trim(),
-      password: $("current-password").value
-    });
+    const erro = await conta.entrar(supabase, $("email").value, $("current-password").value);
 
-    if (error) {
-      avisar("aviso-entrar", traduzirErro(error), true);
+    if (erro) {
+      avisar("aviso-entrar", erro, true);
     }
   });
 }
@@ -269,17 +247,18 @@ async function criarConta(evento) {
   evento.preventDefault();
 
   await comBotaoOcupado(evento.submitter, async () => {
-    const { data, error } = await supabase.auth.signUp({
-      email: $("cadastro-email").value.trim(),
-      password: $("new-password").value,
-      options: { emailRedirectTo: location.origin + location.pathname }
-    });
+    const { erro, aviso } = await conta.criarConta(
+      supabase,
+      $("cadastro-email").value,
+      $("new-password").value,
+      enderecoDoSite()
+    );
 
-    if (error) {
-      avisar("aviso-entrar", traduzirErro(error), true);
-    } else if (!data.session) {
+    if (erro) {
+      avisar("aviso-entrar", erro, true);
+    } else if (aviso) {
       mostrarFormulario("entrar");
-      avisar("aviso-entrar", "Conta criada. Confirme pelo link que enviamos para o seu e-mail e depois entre.");
+      avisar("aviso-entrar", aviso);
     }
   });
 }
@@ -288,15 +267,13 @@ async function pedirRecuperacao(evento) {
   evento.preventDefault();
 
   await comBotaoOcupado(evento.submitter, async () => {
-    const { error } = await supabase.auth.resetPasswordForEmail($("recuperar-email").value.trim(), {
-      redirectTo: location.origin + location.pathname
-    });
+    const { erro, aviso } = await conta.pedirRecuperacao(supabase, $("recuperar-email").value, enderecoDoSite());
 
-    if (error) {
-      avisar("aviso-entrar", traduzirErro(error), true);
+    if (erro) {
+      avisar("aviso-entrar", erro, true);
     } else {
       mostrarFormulario("entrar");
-      avisar("aviso-entrar", "Se houver uma conta com este e-mail, o link para criar a senha nova foi enviado.");
+      avisar("aviso-entrar", aviso);
     }
   });
 }
@@ -305,16 +282,16 @@ async function salvarSenhaNova(evento) {
   evento.preventDefault();
 
   await comBotaoOcupado(evento.submitter, async () => {
-    const { data, error } = await supabase.auth.updateUser({ password: $("senha-nova").value });
+    const { erro, usuario } = await conta.trocarSenha(supabase, $("senha-nova").value);
 
-    if (error) {
-      avisar("aviso-entrar", traduzirErro(error), true);
+    if (erro) {
+      avisar("aviso-entrar", erro, true);
       return;
     }
 
-    recuperandoSenha = false;
+    sessao = { ...sessao, recuperandoSenha: false };
     $("form-nova-senha").reset();
-    await aoMudarSessao("SIGNED_IN", { user: data.user });
+    await aoMudarSessao("SIGNED_IN", { user: usuario });
   });
 }
 
@@ -329,7 +306,7 @@ async function sair() {
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    avisar("aviso-lista", traduzirErro(error), true);
+    avisar("aviso-lista", conta.traduzirErro(error), true);
   }
 }
 
@@ -342,18 +319,15 @@ async function mostrarLista() {
   mostrarTela("lista");
   avisar("aviso-lista", "Carregando…");
 
-  const { data, error } = await supabase
-    .from("lancamentos")
-    .select("id, escola, turma, disciplina, trimestre, atualizado_em, alunos(count)")
-    .order("atualizado_em", { ascending: false });
+  const { lancamentos, erro } = await dados.listarLancamentos(supabase);
 
-  if (error) {
-    avisar("aviso-lista", traduzirErro(error), true);
+  if (erro) {
+    avisar("aviso-lista", conta.traduzirErro(erro), true);
     return;
   }
 
   avisar("aviso-lista", "");
-  desenharLista(data);
+  desenharLista(lancamentos);
 }
 
 function nomeDoLancamento(cabecalho) {
@@ -427,10 +401,10 @@ async function excluirLancamento(lancamento, botao) {
   }
 
   await comBotaoOcupado(botao, async () => {
-    const { error } = await supabase.from("lancamentos").delete().eq("id", lancamento.id);
+    const erro = await dados.excluirLancamento(supabase, lancamento.id);
 
-    if (error) {
-      avisar("aviso-lista", traduzirErro(error), true);
+    if (erro) {
+      avisar("aviso-lista", conta.traduzirErro(erro), true);
     } else {
       await mostrarLista();
     }
@@ -440,42 +414,27 @@ async function excluirLancamento(lancamento, botao) {
 // ----- Planilha -----
 
 async function abrirLancamento(id) {
-  const { data, error } = await supabase.from("lancamentos").select("*, alunos(*)").eq("id", id).maybeSingle();
+  const lido = await dados.carregarLancamento(supabase, id);
 
-  if (error || !data) {
+  if (!lido.planilha) {
     await mostrarLista();
-    avisar("aviso-lista", error ? traduzirErro(error) : "Este lançamento não existe mais.", true);
+    avisar("aviso-lista", lido.erro ? conta.traduzirErro(lido.erro) : "Este lançamento não existe mais.", true);
     return;
   }
 
-  const alunos = [...data.alunos]
-    .sort((a, b) => a.posicao - b.posicao)
-    .map((linha) => {
-      const aluno = { id: linha.id, ...notas.novoAluno() };
-
-      aluno.nome = linha.nome;
-
-      for (const chave of CHAVES_ATIVIDADES) {
-        aluno.notas[chave] = notas.normalizarNota(linha[chave]);
-      }
-
-      return aluno;
-    });
-
-  abrirPlanilha(data.id, data, alunos);
+  abrirPlanilha(lido.planilha, lido.cabecalho);
   definirStatus("Lançamento carregado.");
 }
 
-function abrirPlanilha(id, cabecalho, alunos) {
-  // "removidos" guarda os alunos já gravados que foram tirados da tabela e ainda precisam sair do banco.
-  planilha = { id, alunos: alunos.length > 0 ? alunos : [criarAluno()], removidos: [] };
+function abrirPlanilha(nova, cabecalho) {
+  planilha = nova;
   alterado = false;
 
   for (const chave of Object.keys(notas.CAMPOS_CABECALHO)) {
     $(`campo-${chave}`).value = cabecalho[chave] ?? "";
   }
 
-  history.replaceState(null, "", location.pathname + location.search + (id ? `#${id}` : ""));
+  history.replaceState(null, "", location.pathname + location.search + (planilha.id ? `#${planilha.id}` : ""));
   atualizarTitulo();
   desenharTabela();
   definirStatus("Novo lançamento. Preencha os dados e clique em Salvar.");
@@ -654,17 +613,13 @@ function descerComEnter(evento) {
   }
 }
 
-function criarAluno() {
-  return { id: crypto.randomUUID(), ...notas.novoAluno() };
-}
-
 function adicionarAluno() {
-  if (planilha.alunos.length >= MAXIMO_DE_ALUNOS) {
-    definirStatus(`Um lançamento aceita no máximo ${MAXIMO_DE_ALUNOS} alunos.`, "erro");
+  if (planilha.alunos.length >= dados.MAXIMO_DE_ALUNOS) {
+    definirStatus(`Um lançamento aceita no máximo ${dados.MAXIMO_DE_ALUNOS} alunos.`, "erro");
     return;
   }
 
-  planilha.alunos.push(criarAluno());
+  planilha.alunos.push(dados.criarAluno());
   desenharTabela();
   marcarAlterado();
 
@@ -684,8 +639,7 @@ async function removerAluno(aluno) {
     return;
   }
 
-  planilha.alunos = planilha.alunos.filter((item) => item !== aluno);
-  planilha.removidos.push(aluno.id);
+  dados.removerAluno(planilha, aluno);
   desenharTabela();
   marcarAlterado();
 }
@@ -701,10 +655,10 @@ async function salvar() {
   return comBotaoOcupado(botao, async () => {
     definirStatus("Salvando…");
 
-    const erro = await gravarPlanilha();
+    const erro = await dados.gravarPlanilha(supabase, planilha, lerCabecalho());
 
     if (erro) {
-      definirStatus(`Não foi possível salvar: ${traduzirErro(erro)}`, "erro");
+      definirStatus(`Não foi possível salvar: ${conta.traduzirErro(erro)}`, "erro");
       return false;
     }
 
@@ -716,70 +670,11 @@ async function salvar() {
   });
 }
 
-/**
- * Grava cabeçalho, alunos e remoções, nessa ordem. Devolve o erro, se houver.
- * Se falhar no meio, nada do que está na tela se perde: basta salvar de novo.
- */
-async function gravarPlanilha() {
-  const cabecalho = lerCabecalho();
-
-  cabecalho.data = cabecalho.data || null;
-
-  if (planilha.id) {
-    const { data, error } = await supabase.from("lancamentos").update(cabecalho).eq("id", planilha.id).select("id");
-
-    if (error) {
-      return error;
-    }
-
-    if (data.length === 0) {
-      return new Error("este lançamento não existe mais (pode ter sido excluído em outro aparelho).");
-    }
-  } else {
-    const { data, error } = await supabase.from("lancamentos").insert(cabecalho).select("id").single();
-
-    if (error) {
-      return error;
-    }
-
-    // Guardado já aqui para uma nova tentativa não criar outro lançamento.
-    planilha.id = data.id;
-  }
-
-  const linhas = planilha.alunos.map((aluno, indice) => ({
-    id: aluno.id,
-    lancamento_id: planilha.id,
-    posicao: indice + 1,
-    nome: aluno.nome.trim(),
-    ...Object.fromEntries(CHAVES_ATIVIDADES.map((chave) => [chave, notas.interpretarNota(aluno.notas[chave])]))
-  }));
-
-  if (linhas.length > 0) {
-    const { error } = await supabase.from("alunos").upsert(linhas);
-
-    if (error) {
-      return error;
-    }
-  }
-
-  if (planilha.removidos.length > 0) {
-    const { error } = await supabase.from("alunos").delete().in("id", planilha.removidos);
-
-    if (error) {
-      return error;
-    }
-
-    planilha.removidos = [];
-  }
-
-  return null;
-}
-
 function exportarCsv() {
   const cabecalho = lerCabecalho();
   const nome = nomeDoLancamento(cabecalho).replace(/[\\/:*?"<>|]+/g, "").replaceAll(" · ", " - ");
   // O BOM no início faz o Excel reconhecer os acentos.
-  const arquivo = new Blob(["﻿" + notas.gerarCsv(cabecalho, planilha.alunos)], { type: "text/csv;charset=utf-8" });
+  const arquivo = new Blob(["\uFEFF" + notas.gerarCsv(cabecalho, planilha.alunos)], { type: "text/csv;charset=utf-8" });
   const endereco = URL.createObjectURL(arquivo);
   const link = document.createElement("a");
 
