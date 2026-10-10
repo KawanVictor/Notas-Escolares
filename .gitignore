@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# Lançamentos salvos: contêm nomes e notas de alunos.
+dados/
