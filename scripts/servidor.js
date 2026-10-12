@@ -10,9 +10,7 @@ const RAIZ = fileURLToPath(new URL("../public", import.meta.url));
 const TIPOS = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".png": "image/png",
-  ".svg": "image/svg+xml"
+  ".js": "text/javascript; charset=utf-8"
 };
 
 createServer(async (pedido, resposta) => {
