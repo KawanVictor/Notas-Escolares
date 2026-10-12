@@ -15,7 +15,9 @@ Os nomes e as notas da imagem são fictícios.
 1. Abra o site e clique em **Criar conta**. A senha precisa ter pelo menos 8 caracteres. Confirme o cadastro pelo link enviado ao seu e-mail; antes disso o site não deixa entrar.
 2. Clique em **Novo lançamento** e preencha os dados da turma (escola, turma, disciplina, trimestre, professor e data).
 3. Clique em **Adicionar aluno** para cada aluno e digite o nome e as notas.
-4. Clique em **Salvar** (ou `Ctrl+S`). Nada é gravado sozinho: o site avisa se você tentar sair com alterações não salvas.
+4. Clique em **Salvar** (ou `Ctrl+S`). Nada é gravado sozinho: o site avisa se você tentar sair com alterações não salvas. Enquanto houver algo pendente, o botão mostra **Salvar alterações**; depois de gravar, mostra **Salvo**.
+
+Ao abrir um lançamento já salvo, os dados da turma ficam recolhidos em uma linha acima da tabela; clique em **Dados da turma** para editá-los. Os nomes das atividades aparecem abreviados no cabeçalho da tabela, e o nome completo aparece ao passar o mouse, na impressão e no CSV.
 
 As notas vão de 0 a 6 e aceitam vírgula ou ponto (`4,5` ou `4.5`). `Enter` confirma a nota e desce para o próximo aluno; `Tab` vai para a próxima coluna.
 

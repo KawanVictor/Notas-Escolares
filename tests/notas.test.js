@@ -142,3 +142,7 @@ test("CSV não mexe em nomes comuns nem nas notas", () => {
 
   assert.ok(linha.startsWith("1;Ana-Maria d'Ávila;0;4,5;"), linha);
 });
+
+test("toda atividade tem um nome curto para o cabeçalho da tabela", () => {
+  assert.deepEqual(Object.keys(notas.ROTULOS_CURTOS), Object.keys(notas.TODAS_ATIVIDADES));
+});

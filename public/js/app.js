@@ -17,6 +17,8 @@ const $ = (id) => document.getElementById(id);
 let sessao = conta.estadoInicialDaSessao(location.hash.includes("type=recovery"));
 let planilha = null;
 let alterado = false;
+// Conta as edições, para saber se algo mudou enquanto uma gravação estava em andamento.
+let edicoes = 0;
 let supabase = null;
 
 if (SUPABASE_URL && SUPABASE_CHAVE_PUBLICA) {
@@ -59,6 +61,8 @@ function definirStatus(texto, tipo = "") {
 
 function marcarAlterado() {
   alterado = true;
+  edicoes += 1;
+  atualizarBotaoSalvar();
   definirStatus("Há alterações ainda não salvas.", "alerta");
 }
 
@@ -146,10 +150,19 @@ function montarPagina() {
     $("dados-turma").append(campo);
   }
 
-  for (const rotulo of Object.values(notas.TODAS_ATIVIDADES)) {
+  for (const [chave, rotulo] of Object.entries(notas.TODAS_ATIVIDADES)) {
     const titulo = document.createElement("th");
+    const curto = document.createElement("span");
+    const completo = document.createElement("span");
 
-    titulo.textContent = rotulo;
+    // Na tela aparece o nome curto, para a tabela caber; o completo vai na dica, na impressão e para leitores de tela.
+    curto.className = "rotulo-curto";
+    curto.textContent = notas.ROTULOS_CURTOS[chave];
+    curto.setAttribute("aria-hidden", "true");
+    completo.className = "rotulo-completo";
+    completo.textContent = rotulo;
+    titulo.title = rotulo;
+    titulo.append(curto, completo);
     $("titulos-atividades").append(titulo);
   }
 
@@ -178,6 +191,17 @@ function montarPagina() {
   $("btn-salvar").addEventListener("click", salvar);
   $("btn-csv").addEventListener("click", exportarCsv);
   $("btn-imprimir").addEventListener("click", () => window.print());
+
+  // Na impressão os dados da turma aparecem sempre, mesmo que estejam recolhidos na tela.
+  let turmaEstavaAberta = false;
+
+  window.addEventListener("beforeprint", () => {
+    turmaEstavaAberta = $("detalhes-turma").open;
+    $("detalhes-turma").open = true;
+  });
+  window.addEventListener("afterprint", () => {
+    $("detalhes-turma").open = turmaEstavaAberta;
+  });
 
   document.addEventListener("keydown", (evento) => {
     if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === "s" && !$("tela-planilha").hidden) {
@@ -434,8 +458,11 @@ function abrirPlanilha(nova, cabecalho) {
     $(`campo-${chave}`).value = cabecalho[chave] ?? "";
   }
 
+  // Lançamento já salvo abre com os dados da turma recolhidos, deixando mais espaço para a tabela.
+  $("detalhes-turma").open = !planilha.id;
   history.replaceState(null, "", location.pathname + location.search + (planilha.id ? `#${planilha.id}` : ""));
   atualizarTitulo();
+  atualizarBotaoSalvar();
   desenharTabela();
   definirStatus("Novo lançamento. Preencha os dados e clique em Salvar.");
   mostrarTela("planilha");
@@ -452,7 +479,27 @@ function lerCabecalho() {
 }
 
 function atualizarTitulo() {
-  $("titulo-planilha").textContent = nomeDoLancamento(lerCabecalho()) || "Novo lançamento";
+  const cabecalho = lerCabecalho();
+
+  $("titulo-planilha").textContent = nomeDoLancamento(cabecalho) || "Novo lançamento";
+  // Turma, disciplina e trimestre já estão no título; o resumo mostra o restante.
+  $("resumo-turma").textContent = [
+    cabecalho.escola,
+    cabecalho.ano_serie,
+    cabecalho.professor,
+    notas.formatarData(cabecalho.data)
+  ].filter(Boolean).join(" · ");
+}
+
+/** O botão Salvar mostra se há algo pendente: "Salvar alterações", "Salvo" ou "Salvar" (lançamento novo). */
+function atualizarBotaoSalvar() {
+  const botao = $("btn-salvar");
+  const nuncaSalvo = !planilha?.id;
+
+  botao.textContent = alterado ? "Salvar alterações" : nuncaSalvo ? "Salvar" : "Salvo";
+  botao.className = alterado || nuncaSalvo ? "primario" : "secundario";
+  botao.classList.toggle("pendente", alterado);
+  botao.title = alterado || nuncaSalvo ? "" : "Não há alterações para salvar";
 }
 
 function desenharTabela() {
@@ -653,18 +700,29 @@ async function salvar() {
   }
 
   return comBotaoOcupado(botao, async () => {
+    const edicoesAoSalvar = edicoes;
+
     definirStatus("Salvando…");
+    botao.textContent = "Salvando…";
 
     const erro = await dados.gravarPlanilha(supabase, planilha, lerCabecalho());
 
     if (erro) {
+      atualizarBotaoSalvar();
       definirStatus(`Não foi possível salvar: ${conta.traduzirErro(erro)}`, "erro");
       return false;
     }
 
-    alterado = false;
     history.replaceState(null, "", `${location.pathname}${location.search}#${planilha.id}`);
-    definirStatus(`Dados salvos às ${new Date().toLocaleTimeString("pt-BR", { timeStyle: "short" })}.`);
+    // Se algo foi digitado enquanto a gravação rodava, o lançamento continua com alterações pendentes.
+    alterado = edicoes !== edicoesAoSalvar;
+    atualizarBotaoSalvar();
+
+    if (alterado) {
+      definirStatus("Há alterações ainda não salvas.", "alerta");
+    } else {
+      definirStatus(`Dados salvos às ${new Date().toLocaleTimeString("pt-BR", { timeStyle: "short" })}.`);
+    }
 
     return true;
   });

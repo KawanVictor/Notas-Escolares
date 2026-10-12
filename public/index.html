@@ -106,7 +106,13 @@
           </div>
         </header>
 
-        <section id="dados-turma" class="dados-turma" aria-label="Dados da turma"></section>
+        <details id="detalhes-turma" class="detalhes-turma">
+          <summary>
+            <span class="resumo-rotulo">Dados da turma</span>
+            <span id="resumo-turma" class="suave"></span>
+          </summary>
+          <div id="dados-turma" class="dados-turma"></div>
+        </details>
 
         <div class="barra-status no-print">
           <span id="status" role="status" aria-live="polite"></span>

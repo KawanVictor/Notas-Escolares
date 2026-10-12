@@ -35,6 +35,22 @@ export const AVALIACOES_INTEGRADAS = {
 
 export const TODAS_ATIVIDADES = { ...ATIVIDADES_PRINCIPAIS, ...AVALIACOES_INTEGRADAS };
 
+// Nomes curtos para o cabeçalho da tabela na tela, onde as colunas são estreitas.
+// O nome completo continua na dica da coluna, na impressão e no CSV.
+// "­" marca onde a palavra pode ser dividida com hífen se a coluna ficar estreita demais.
+export const ROTULOS_CURTOS = {
+  oralidade: "Oralidade",
+  leitura: "Leitura",
+  producao_textual: "Produção textual",
+  gramatica: "Gramática",
+  ortografia: "Orto­grafia",
+  participacao: "Partici­pação",
+  atividade1: "Avaliativa 1",
+  atividade2: "Avaliativa 2",
+  integrada1: "Integrada 1",
+  integrada2: "Integrada 2"
+};
+
 export const MEDIAS = {
   media_total: "Média total",
   media_integrada: "Média avaliação integrada",

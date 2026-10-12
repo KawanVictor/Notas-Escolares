@@ -307,11 +307,48 @@ input[type="date"] {
 
 /* Planilha */
 
+.detalhes-turma summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+.detalhes-turma summary::before {
+  content: "▸";
+  color: var(--azul);
+}
+
+.detalhes-turma[open] summary::before {
+  content: "▾";
+}
+
+.resumo-rotulo {
+  flex: none;
+  color: var(--azul);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+#resumo-turma {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Com os campos à mostra, o resumo seria repetição. */
+.detalhes-turma[open] #resumo-turma {
+  display: none;
+}
+
 .dados-turma {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 12px;
-  padding: 16px 20px;
+  padding: 0 20px 16px;
 }
 
 .dados-turma label {
@@ -321,6 +358,28 @@ input[type="date"] {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+/* O campo fica dentro do rótulo; sem isto herdaria a letra pequena e em negrito dele. */
+.dados-turma input {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Largura fixa para os botões vizinhos não se moverem quando o texto do Salvar muda. */
+#btn-salvar {
+  min-width: 172px;
+}
+
+/* Bolinha no botão Salvar enquanto houver alterações não gravadas. */
+#btn-salvar.pendente::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #fbbf24;
 }
 
 .barra-status {
@@ -360,8 +419,12 @@ input[type="date"] {
 }
 
 table {
+  --largura-numero: 44px;
+  --largura-nome: 210px;
+
   width: 100%;
-  min-width: 1640px;
+  /* Cabe sem rolagem lateral em um notebook de 1366 px; em telas maiores as colunas de nota se alargam. */
+  min-width: 1180px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -388,15 +451,54 @@ tbody tr:last-child td {
 thead {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
 }
 
 th {
-  padding: 7px 6px;
+  padding: 7px 4px;
   background: var(--azul-claro);
   color: #0f172a;
   font-size: 12px;
   line-height: 1.2;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Nome completo da atividade: fora da tela, mas lido por leitores de tela e usado na impressão. */
+.rotulo-completo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Nº e nome ficam presos à esquerda quando a tabela rola para o lado. */
+th.col-numero,
+td.numero,
+th.col-nome,
+td.nome {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+th.col-nome,
+td.nome {
+  left: var(--largura-numero);
+  box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.3);
+}
+
+/* Células presas precisam de fundo próprio, senão as notas apareceriam por baixo ao rolar. */
+td.numero,
+td.nome {
+  background: var(--folha);
+}
+
+tbody tr:nth-child(even) td.numero,
+tbody tr:nth-child(even) td.nome {
+  background: var(--zebra);
 }
 
 thead tr:nth-child(2) th {
@@ -412,15 +514,15 @@ th.calculada {
 }
 
 .col-numero {
-  width: 48px;
+  width: var(--largura-numero);
 }
 
 .col-nome {
-  width: 240px;
+  width: var(--largura-nome);
 }
 
 .col-acoes {
-  width: 96px;
+  width: 88px;
 }
 
 tbody tr:nth-child(even) {
@@ -433,6 +535,7 @@ td.numero {
 
 td input[type="text"] {
   min-height: 34px;
+  padding-inline: 2px;
   border-color: transparent;
   border-radius: 0;
   background: transparent;
@@ -440,6 +543,7 @@ td input[type="text"] {
 }
 
 td.nome input[type="text"] {
+  padding-inline: 10px;
   text-align: left;
 }
 
@@ -519,6 +623,12 @@ dialog p {
     grid-template-columns: 1fr;
   }
 
+  /* No celular a coluna de nomes é mais estreita, para sobrar espaço para as notas. */
+  table {
+    --largura-numero: 34px;
+    --largura-nome: 132px;
+  }
+
   h1 {
     font-size: 20px;
   }
@@ -572,18 +682,41 @@ dialog p {
     overflow: visible;
   }
 
-  thead {
+  thead,
+  th.col-numero,
+  td.numero,
+  th.col-nome,
+  td.nome {
     position: static;
+    box-shadow: none;
   }
 
+  .detalhes-turma summary,
+  .rotulo-curto {
+    display: none;
+  }
+
+  /* No papel vai o nome completo de cada atividade. */
+  .rotulo-completo {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  /* Colunas de número e nome mais estreitas, para os nomes completos das atividades caberem. */
   table {
+    --largura-numero: 26px;
+    --largura-nome: 150px;
+
     min-width: 0;
     font-size: 9px;
   }
 
   th {
-    padding: 3px;
-    font-size: 9px;
+    padding: 3px 2px;
+    font-size: 8.5px;
   }
 
   input[type="text"],
