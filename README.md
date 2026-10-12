@@ -120,7 +120,7 @@ A segurança vem das regras de acesso por linha (RLS): cada usuário só lê e a
 
 O site grava um lançamento em três passos: dados da turma, alunos e, por último, a exclusão dos alunos removidos. Se a conexão cair no meio, o que está na tela não se perde e basta salvar de novo.
 
-Para recriar o banco em outro projeto, execute o arquivo de `supabase/migrations/` no SQL Editor e atualize `config.js` com o endereço e a chave publicável do projeto novo.
+Para recriar o banco em outro projeto, execute os arquivos de `supabase/migrations/` no SQL Editor, na ordem dos nomes, e atualize `config.js` com o endereço e a chave publicável do projeto novo.
 
 Pontos de atenção:
 
